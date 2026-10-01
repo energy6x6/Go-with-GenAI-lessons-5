@@ -1,0 +1,128 @@
+name: Homework Autograder — Заняття 5 (Error Handling)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+jobs:
+  autograde:
+    name: Run all task tests (no fail-fast)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          check-latest: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build all packages (compile check)
+        # continue-on-error тут, щоб навіть якщо якийсь пакунок не
+        # компілюється, ми все одно дійшли до кроку з тестами і побачили,
+        # ЩО саме не компілюється, а не зупинились на першій помилці збірки.
+        id: build
+        continue-on-error: true
+        run: go build ./... 2>&1 | tee build.log
+
+      - name: Task 0 — Refactor into multi-package project
+        id: task0
+        # continue-on-error гарантує, що навіть провал Завдання 0
+        # не зупинить виконання наступних кроків (Завдання 1, 2 тощо) —
+        # студент побачить у логах результати УСІХ завдань одразу.
+        continue-on-error: true
+        run: |
+          echo "::group::Task 0 — task0_refactor (calculator + textanalyzer)"
+          go test ./task0_refactor/... -v 2>&1 | tee task0.log
+          status=${PIPESTATUS[0]}
+          echo "::endgroup::"
+          exit $status
+
+      - name: Task 1 — Registration form validator
+        id: task1
+        continue-on-error: true
+        run: |
+          echo "::group::Task 1 — task1_validation"
+          go test ./task1_validation/... -v 2>&1 | tee task1.log
+          status=${PIPESTATUS[0]}
+          echo "::endgroup::"
+          exit $status
+
+      - name: Task 2 — Retry mechanism
+        id: task2
+        continue-on-error: true
+        run: |
+          echo "::group::Task 2 — task2_retry"
+          go test ./task2_retry/... -v 2>&1 | tee task2.log
+          status=${PIPESTATUS[0]}
+          echo "::endgroup::"
+          exit $status
+
+      - name: go vet (all packages)
+        id: vet
+        continue-on-error: true
+        run: go vet ./... 2>&1 | tee vet.log
+
+      - name: Summary — full report of ALL unfinished tasks
+        if: always()
+        run: |
+          echo "## Homework Autograder Report — Заняття 5 (Error Handling)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          report_task () {
+            local title="$1"
+            local outcome="$2"
+            local logfile="$3"
+            if [ "$outcome" = "success" ]; then
+              echo "- ✅ **$title** — passed" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- ❌ **$title** — FAILED" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          }
+
+          report_task "Build (go build ./...)" "${{ steps.build.outcome }}" build.log
+          report_task "Task 0 — task0_refactor" "${{ steps.task0.outcome }}" task0.log
+          report_task "Task 1 — task1_validation" "${{ steps.task1.outcome }}" task1.log
+          report_task "Task 2 — task2_retry" "${{ steps.task2.outcome }}" task2.log
+          report_task "go vet" "${{ steps.vet.outcome }}" vet.log
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Details" >> "$GITHUB_STEP_SUMMARY"
+          echo "Full failing test output for every task is printed above, in the" >> "$GITHUB_STEP_SUMMARY"
+          echo "corresponding step's log (expand each step to see every failing" >> "$GITHUB_STEP_SUMMARY"
+          echo "test case, not just the first one)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Print full logs for every task (always, even on failure)
+        if: always()
+        run: |
+          for f in build.log task0.log task1.log task2.log vet.log; do
+            if [ -f "$f" ]; then
+              echo "===================================================="
+              echo "FULL LOG: $f"
+              echo "===================================================="
+              cat "$f"
+              echo ""
+            fi
+          done
+
+      - name: Fail the job if ANY task failed
+        if: always()
+        run: |
+          failed=0
+          for outcome in "${{ steps.build.outcome }}" "${{ steps.task0.outcome }}" "${{ steps.task1.outcome }}" "${{ steps.task2.outcome }}" "${{ steps.vet.outcome }}"; do
+            if [ "$outcome" != "success" ]; then
+              failed=1
+            fi
+          done
+          if [ "$failed" -eq 1 ]; then
+            echo "One or more tasks failed. See the step summary and logs above for the full list of unfinished tasks."
+            exit 1
+          fi
+          echo "All tasks passed."
