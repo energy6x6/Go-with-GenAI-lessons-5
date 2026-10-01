@@ -3,10 +3,28 @@
 Репозиторій-темплейт для домашнього завдання до заняття **"Error Handling: від
 panic до elegant recovery"**. Структура та підхід повторюють репозиторії
 попередніх занять курсу: студент дописує код у файлах з позначками `TODO`,
-а GitHub Actions автоматично перевіряє виконання під час кожного push/PR.
+а GitHub Actions перевіряє push у main/master та PR до цих гілок;
+також доступний ручний запуск workflow.
 
 > **Примітка щодо нумерації.** У презентації заняття домашні завдання названі
 > "Завдання 0", "Завдання 1", "Завдання 2" та "Бонус". 
+
+## Виконана робота
+
+Реалізовано завдання 0–2 та рефакторинг із напрямом
+`handler → service → repository`.
+[Звіт AI-рев’ю](error-handling-analysis.md) містить промпт, початковий
+навчальний моноліт як текст і порівняння до/після. До Go-пакетів входить
+лише виправлена реалізація.
+
+Запуск робочого CLI (шлях JSON — файл, який буде створено або перезаписано):
+
+```bash
+go run ./task0_refactor/cmd/app 10 2 "Привіт Go" /tmp/lesson05-report.json
+```
+
+Результат: `quotient=5 words=2 characters=9`; JSON містить ті самі значення.
+Неправильний ввід або помилка I/O завершує програму з кодом 1.
 
 ## Структура репозиторію
 
@@ -16,13 +34,17 @@ panic до elegant recovery"**. Структура та підхід повто�
 ├── task0_refactor/            # Завдання 0: рефакторинг у multi-package проєкт
 │   ├── cmd/app/main.go        # тонкий main.go (лише wiring)
 │   └── internal/
+│       ├── models/            # структура звіту
+│       ├── handler/           # CLI
+│       ├── service/           # сценарій створення звіту
+│       ├── repository/        # JSON-файл
 │       ├── calculator/        # calculator із Заняття 1
 │       └── textanalyzer/      # text analyzer із Заняття 2
 ├── task1_validation/          # Завдання 1: валідатор форми реєстрації
-│   ├── validator.go           # <-- допишіть TODO тут
+│   ├── validator.go
 │   └── validator_test.go
 ├── task2_retry/                # Завдання 2: retry-механізм
-│   ├── retry.go                # <-- допишіть TODO тут
+│   ├── retry.go
 │   └── retry_test.go
 └── .github/workflows/classroom.yml   # автоперевірка
 ```
@@ -62,8 +84,8 @@ go test ./... -v
 
 ## Як працює автоперевірка (GitHub Actions)
 
-Workflow `.github/workflows/classroom.yml` запускається на кожен push і
-pull request. Ключова властивість: **він показує в логах усі незавершені
+Workflow `.github/workflows/classroom.yml` запускається для push у
+main/master, pull request до цих гілок та вручну. Ключова властивість: **він показує в логах усі незавершені
 завдання одночасно**, а не зупиняється на першій помилці, — щоб студент
 одразу бачив весь обсяг роботи, що залишився:
 
